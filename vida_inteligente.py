@@ -113,10 +113,22 @@ def gerar_json_sessao() -> str:
     dados['salvo_em'] = datetime.now().strftime('%d/%m/%Y %H:%M')
     return json.dumps(dados, ensure_ascii=False, indent=2, default=str)
 
-def carregar_json_sessao(dados: dict):
-    for k in CHAVES_SALVAR:
-        if k in dados:
-            st.session_state[k] = dados[k]
+def carregar_json_sessao(dados):
+    _bloq = {'api_key','etapa','nome_login','chave_login','upload_login','btn_entrar_login'}
+    _pref = (
+        'btn_','sel_','ul_','dl_','cad_','_sub','_sm','_tab','_bsc',
+        'ativo_','rem_','sel_pet_','ev_','prof_','hig_','prev_',
+        'vac_','sint_','comp_','trad_','subs_','amb_','viag_','chat_',
+        'duvida_','emerg_','peso_','data_','obs_','tipo_','vet_','desc_',
+        'local_','prox_','alim','sit_emerg_','tc_','oraf','siau','agmag',
+        'lv','mv','pt','pi','sh','wc','rv','rp','rc',
+    )
+    import re as _re
+    for k, v in dados.items():
+        if k in _bloq: continue
+        if any(k.startswith(p) for p in _pref): continue
+        if _re.match(r'.+_\d+$', k): continue
+        st.session_state[k] = v
 
 def salvar_perfil_cache(usuario: str):
     _cache["perfis"][usuario] = {k: st.session_state.get(k) for k in CHAVES_SALVAR}
@@ -309,7 +321,7 @@ if 'data_ultima_missao' not in st.session_state: st.session_state['data_ultima_m
 
 if st.session_state.etapa == "Login":
     st.markdown("# 🤖 VIDA INTELIGENTE")
-    st.markdown("<div class=\'card\'><b>🔒 ACESSO RESTRITO A CLIENTES DO QUIZ COM PRÊMIOS</b><br>🔗 quizcompremios.com.br</div>", unsafe_allow_html=True)
+    st.markdown("<div class=\'card\'><b>🔒 ACESSO RESTRITO A CLIENTES DO QUIZ COM PRÊMIOS</b><br>🔗 <a href='https://quizcompremios.com.br' target='_blank' style='color:#4F46E5;font-weight:700;text-decoration:underline;'>quizcompremios.com.br</a></div>", unsafe_allow_html=True)
     st.info("💻 **Dica:** Pela complexidade dos agentes, no computador a experiência é mais agradável.")
     with st.container():
         nome  = st.text_input("Seu Nome:", key="nome_login")
@@ -334,6 +346,27 @@ elif st.session_state.etapa == "App":
 
     # TABS — navegação nativa
     _tab_Home, _tab_Objetivos, _tab_Planejamento, _tab_MissaoDia, _tab_Projetos, _tab_Tempo, _tab_Habitos, _tab_Diario, _tab_Metas, _tab_Crise, _tab_Revisao, _tab_Relatorio, _tab_Conquistas, _tab_Decisoes = st.tabs(['🏠 Painel da Vida', '🎯 Objetivos Inteligent', '📅 Planejamento Intelig', '🚀 Missão do Dia', '📋 Organizador de Proje', '⏰ Organizador do Tempo', '🔥 Hábitos', '📖 Diário Inteligente', '🏆 Grandes Metas', '🚨 Modo Crise', '🌙 Revisão Noturna', '📈 Relatório Semanal', '🎖️ Sistema de Conquista', '❤️ Central de Decisões'])
+
+    # ── BARRA SALVAR — aparece em todas as abas ──
+    with st.expander("💾 Salvar / Carregar meus dados", expanded=False):
+        _bsc1, _bsc2 = st.columns(2)
+        with _bsc1:
+            import json as _jsv
+            _dsv = {k: st.session_state.get(k) for k in list(st.session_state.keys()) if not k.startswith('_') and k not in ('api_key',)}
+            st.download_button("💾 Baixar meus dados (.json)",
+                data=_jsv.dumps(_dsv, ensure_ascii=False, indent=2, default=str),
+                file_name=f"dados_{st.session_state.get('usuario','user')}.json",
+                mime="application/json", key="dl_barra_sv_vidainte")
+        with _bsc2:
+            _fupsv = st.file_uploader("📂 Carregar dados salvos:", type=["json"], key="ul_barra_sv_vidainte", label_visibility="collapsed")
+            if _fupsv:
+                try:
+                    import json as _jld
+                    for _k2,_v2 in _jld.loads(_fupsv.read().decode()).items():
+                        if _k2 not in ('api_key','etapa'): st.session_state[_k2] = _v2
+                    st.success("✅ Dados restaurados!"); st.rerun()
+                except: st.error("Arquivo inválido.")
+
 
     with _tab_Home:
             col_u, col_r = st.columns([3, 1])
@@ -473,6 +506,7 @@ elif st.session_state.etapa == "App":
                             f"✅ COMO MEDIR PROGRESSO:\n[indicador simples para acompanhar]"
                         )
                         res = vida_ia(prompt)
+                        if res: st.session_state['res_objetivos_vidain1'] = str(res)
                         salvar_plano("Objetivo", objetivo, res)
                         st.session_state['objetivo_temp'] = res
                         app_sugerido = detectar_app_recomendado(objetivo)
@@ -531,6 +565,7 @@ elif st.session_state.etapa == "App":
                             f"⚠️ SINAL DE SOBRECARGA:\n[se a lista for grande demais para o tempo disponível, avise isso claramente e sugira o que cortar]"
                         )
                         res = vida_ia(prompt)
+                        if res: st.session_state['res_planejamento_vidain2'] = str(res)
                         salvar_plano("Planejamento", "Organização do dia", res)
                         st.session_state['plan_temp'] = res
                 else:
@@ -566,6 +601,7 @@ elif st.session_state.etapa == "App":
                             f"Exemplo de formato esperado:\nFinalizar o orçamento mensal\nCaminhar 30 minutos\nEstudar inglês por 20 minutos\nLigar para o cliente pendente"
                         )
                         res = vida_ia(prompt)
+                        if res: st.session_state['res_missaodia_vidain3'] = str(res)
                         itens = [linha.strip() for linha in res.split('\n') if linha.strip() and len(linha.strip()) > 5][:6]
                         st.session_state.missoes_hoje = itens
                         st.session_state.missoes_concluidas_hoje_temp = []
@@ -648,6 +684,7 @@ elif st.session_state.etapa == "App":
                             f"✅ PRIMEIRA AÇÃO CONCRETA (comece hoje):\n[1 ação imediata]"
                         )
                         res = vida_ia(prompt)
+                        if res: st.session_state['res_projetos_vidain4'] = str(res)
                         salvar_plano("Projeto", nome_projeto, res)
                         if nome_projeto not in st.session_state.projetos_ativos:
                             st.session_state.projetos_ativos.append(nome_projeto)
@@ -709,6 +746,7 @@ elif st.session_state.etapa == "App":
                             f"✅ COMO RECUPERAR PELO MENOS 1 HORA POR DIA:\n[sugestão concreta e realista]"
                         )
                         res = vida_ia(prompt)
+                        if res: st.session_state['res_tempo_vidain5'] = str(res)
                         salvar_plano("Tempo", "Análise de rotina", res)
                         st.session_state['tempo_temp'] = res
                 else:
@@ -758,6 +796,7 @@ elif st.session_state.etapa == "App":
                             f"💡 DICA DE CONSISTÊNCIA:\n[1 técnica prática para não desistir nas primeiras semanas]"
                         )
                         res = vida_ia(prompt)
+                        if res: st.session_state['res_habitos_vidain6'] = str(res)
                         salvar_plano("Hábitos", "Estratégia de hábitos", res)
                         st.session_state['habito_estrategia_temp'] = res
 
@@ -879,6 +918,7 @@ elif st.session_state.etapa == "App":
                             f"💪 PRÓXIMO PASSO QUANDO ESTABILIZAR:\n[1 frase sobre o que vem depois, com esperança realista]"
                         )
                         res = vida_ia(prompt, "MODO CRISE: seja acolhedor, realista e prático. A pessoa precisa de clareza e cuidado, não de pressão para produtividade.")
+                        if res: st.session_state['res_crise_vidain7'] = str(res)
                         salvar_plano("Modo Crise", situacao_crise[:60], res)
                         st.session_state['crise_temp'] = res
                         app_sugerido = detectar_app_recomendado(situacao_crise)
@@ -952,6 +992,7 @@ elif st.session_state.etapa == "App":
                         f"💬 MENSAGEM DO SEU GERENTE PESSOAL:\n[1-2 frases motivadoras e realistas para a próxima semana]"
                     )
                     res = vida_ia(prompt)
+                    if res: st.session_state['res_relatorio_vidain8'] = str(res)
                     salvar_plano("Relatório Semanal", datetime.now().strftime('%d/%m/%Y'), res)
                     st.session_state['relatorio_temp'] = res
 
@@ -1015,6 +1056,7 @@ elif st.session_state.etapa == "App":
                             f"🧠 CAMINHO SUGERIDO:\n[uma sugestão clara, mas deixando explícito que a decisão final é da pessoa]"
                         )
                         res = vida_ia(prompt)
+                        if res: st.session_state['res_decisoes_vidain9'] = str(res)
                         salvar_plano("Decisão", duvida[:60], res)
                         st.session_state['decisao_temp'] = res
                         app_sugerido = detectar_app_recomendado(duvida + " " + contexto_decisao)
